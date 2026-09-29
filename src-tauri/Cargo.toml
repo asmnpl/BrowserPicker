@@ -1,6 +1,6 @@
 [package]
 name = "browserpicker"
-version = "0.1.0"
+version = "0.1.1"
 description = "Pick a browser for every link you open"
 authors = ["asmn"]
 license = "MIT"
@@ -32,7 +32,7 @@ objc2-foundation = { version = "0.3", default-features = false, features = [
 ] }
 objc2-app-kit = { version = "0.3", default-features = false, features = [
   "std", "block2", "NSWorkspace", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "NSGraphics",
-  "NSWindow", "NSResponder",
+  "NSWindow", "NSResponder", "NSEvent", "NSScreen",
 ] }
 
 [target.'cfg(windows)'.dependencies]

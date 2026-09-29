@@ -1,15 +1,18 @@
 use std::process::Command;
 
 use objc2::rc::{autoreleasepool, Retained};
-use objc2::AnyThread;
+use objc2::{AnyThread, MainThreadMarker};
 use objc2_app_kit::{
-    NSBitmapImageFileType, NSBitmapImageRep, NSCompositingOperation, NSDeviceRGBColorSpace,
-    NSGraphicsContext, NSWindow, NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWorkspace,
+    NSBitmapImageFileType, NSBitmapImageRep, NSCompositingOperation, NSDeviceRGBColorSpace, NSEvent,
+    NSGraphicsContext, NSScreen, NSWindow, NSWindowAnimationBehavior, NSWindowCollectionBehavior,
+    NSWorkspace,
 };
 use objc2_foundation::{NSBundle, NSDictionary, NSFileManager, NSPoint, NSRect, NSSize, NSString, NSURL};
 use tauri::WebviewWindow;
 
 use crate::browsers::{png_data_url, Browser, Launch};
+use crate::config::Placement;
+use crate::placement::{self, Rect};
 
 const ICON_PX: isize = 128;
 
@@ -109,6 +112,41 @@ pub fn style_picker(window: &WebviewWindow) {
             | NSWindowCollectionBehavior::FullScreenAuxiliary
             | NSWindowCollectionBehavior::Transient,
     );
+}
+
+/// Cocoa rects have a bottom-left origin; `placement` works with y growing downwards.
+fn flipped(rect: NSRect) -> Rect {
+    Rect {
+        x: rect.origin.x,
+        y: -(rect.origin.y + rect.size.height),
+        width: rect.size.width,
+        height: rect.size.height,
+    }
+}
+
+/// Places the picker (`width`×`height` points) on the display under the cursor and shows it.
+pub fn present_picker(window: &WebviewWindow, width: f64, height: f64, placement: Placement) {
+    let handle = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        let Some(mtm) = MainThreadMarker::new() else { return };
+        let Ok(ptr) = handle.ns_window() else { return };
+        let ns_window: &NSWindow = unsafe { &*(ptr as *const NSWindow) };
+
+        let mouse = NSEvent::mouseLocation();
+        let cursor = (mouse.x, -mouse.y);
+        let screen = NSScreen::screens(mtm)
+            .iter()
+            .find(|screen| flipped(screen.frame()).contains(cursor.0, cursor.1))
+            .or_else(|| NSScreen::mainScreen(mtm));
+        if let Some(screen) = screen {
+            let area = flipped(screen.visibleFrame());
+            let (x, top) = placement::position(area, cursor, width, height, placement, placement::MARGIN);
+            let frame = NSRect::new(NSPoint::new(x, -top - height), NSSize::new(width, height));
+            ns_window.setFrame_display(frame, true);
+        }
+        let _ = handle.show();
+        let _ = handle.set_focus();
+    });
 }
 
 pub fn register() {}
