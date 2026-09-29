@@ -1,7 +1,7 @@
 {
   "name": "browserpicker",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Pick a browser for every link you open",
   "license": "MIT",
   "scripts": {
