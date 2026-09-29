@@ -1,5 +1,6 @@
 mod browsers;
 mod config;
+mod placement;
 mod platform;
 mod tray;
 
@@ -11,10 +12,9 @@ use serde::Serialize;
 use tauri::window::EffectState;
 #[cfg(any(target_os = "macos", windows))]
 use tauri::{utils::config::WindowEffectsConfig, window::Effect};
-use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, RunEvent, State, WebviewUrl, WebviewWindow,
-    WebviewWindowBuilder,
-};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+#[cfg(not(target_os = "macos"))]
+use tauri::{PhysicalPosition, PhysicalSize};
 use tauri_plugin_autostart::ManagerExt as _;
 
 use browsers::{Browser, BrowserView};
@@ -211,40 +211,54 @@ fn get_browsers(state: State<AppState>, include_hidden: bool) -> Vec<BrowserView
 fn present_picker(app: AppHandle, state: State<AppState>, width: f64, height: f64) -> Result<(), String> {
     let window = app.get_webview_window(PICKER).ok_or("picker window is missing")?;
     let placement = state.config.lock().unwrap().placement;
-    let cursor = app.cursor_position().unwrap_or_default();
-    let monitor = app
-        .monitor_from_point(cursor.x, cursor.y)
-        .ok()
-        .flatten()
-        .or_else(|| app.primary_monitor().ok().flatten())
-        .ok_or("no monitor found")?;
 
-    let scale = monitor.scale_factor();
-    let size = PhysicalSize::new((width * scale).ceil(), (height * scale).ceil());
-    let area = monitor.work_area();
-    let (left, top) = (area.position.x as f64, area.position.y as f64);
-    let (right, bottom) = (left + area.size.width as f64, top + area.size.height as f64);
-
-    let (x, y) = match placement {
-        Placement::Cursor => (cursor.x - size.width / 2.0, cursor.y - size.height * 0.4),
-        Placement::Center => {
-            (left + (right - left - size.width) / 2.0, top + (bottom - top - size.height) * 0.4)
-        }
-    };
-    let margin = 8.0 * scale;
-    let x = x.min(right - size.width - margin).max(left + margin);
-    let y = y.min(bottom - size.height - margin).max(top + margin);
-
-    window
-        .set_position(PhysicalPosition::new(x.round() as i32, y.round() as i32))
-        .map_err(|e| e.to_string())?;
-    window.set_size(PhysicalSize::new(size.width as u32, size.height as u32)).map_err(|e| e.to_string())?;
-    // Undo the app-level hide from the last dismissal.
+    // AppKit's own screen geometry is used on macOS: tao reports the cursor in
+    // primary-display pixels but looks monitors up in points, which sends the
+    // picker to the main display whenever the cursor is on another one.
     #[cfg(target_os = "macos")]
-    let _ = app.show();
-    window.show().map_err(|e| e.to_string())?;
-    window.set_focus().map_err(|e| e.to_string())?;
-    Ok(())
+    {
+        // Undo the app-level hide from the last dismissal.
+        let _ = app.show();
+        platform::present_picker(&window, width, height, placement);
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let cursor = app.cursor_position().unwrap_or_default();
+        let monitor = app
+            .monitor_from_point(cursor.x, cursor.y)
+            .ok()
+            .flatten()
+            .or_else(|| app.primary_monitor().ok().flatten())
+            .ok_or("no monitor found")?;
+
+        let scale = monitor.scale_factor();
+        let (width, height) = ((width * scale).ceil(), (height * scale).ceil());
+        let area = monitor.work_area();
+        let area = placement::Rect {
+            x: area.position.x as f64,
+            y: area.position.y as f64,
+            width: area.size.width as f64,
+            height: area.size.height as f64,
+        };
+        let (x, y) = placement::position(
+            area,
+            (cursor.x, cursor.y),
+            width,
+            height,
+            placement,
+            placement::MARGIN * scale,
+        );
+
+        window
+            .set_position(PhysicalPosition::new(x.round() as i32, y.round() as i32))
+            .map_err(|e| e.to_string())?;
+        window.set_size(PhysicalSize::new(width as u32, height as u32)).map_err(|e| e.to_string())?;
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        Ok(())
+    }
 }
 
 #[tauri::command]
