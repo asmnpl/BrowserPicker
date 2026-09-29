@@ -40,14 +40,15 @@ Download the latest `.dmg` (macOS) or `-setup.exe` (Windows) from
 [Releases](https://github.com/asmnpl/BrowserPicker/releases).
 
 **macOS 12+.** Drag BrowserPicker to Applications and open it. The builds are not notarized
-yet, so the first time, right-click the app and choose **Open**, or run:
+yet, so macOS blocks the first launch. Go to *System Settings → Privacy & Security* and click
+**Open Anyway**, or run:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/BrowserPicker.app
 ```
 
 **Windows 10/11.** Run the installer. It installs for the current user, so no admin rights
-are needed.
+are needed. If SmartScreen warns about an unknown publisher, click *More info → Run anyway*.
 
 Then click **Make Default** in the settings window:
 
