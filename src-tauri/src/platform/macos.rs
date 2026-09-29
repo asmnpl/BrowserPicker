@@ -124,6 +124,24 @@ fn flipped(rect: NSRect) -> Rect {
     }
 }
 
+fn describe(rect: NSRect) -> String {
+    format!("({:.0}, {:.0}) {:.0}x{:.0}", rect.origin.x, rect.origin.y, rect.size.width, rect.size.height)
+}
+
+fn same_origin(a: NSRect, b: NSRect) -> bool {
+    (a.origin.x - b.origin.x).abs() < 1.0 && (a.origin.y - b.origin.y).abs() < 1.0
+}
+
+/// Overwrites `~/Library/Logs/BrowserPicker/placement.log` with the last placement,
+/// so multi-display issues can be diagnosed from a user's report.
+fn log_placement(lines: &[String]) {
+    let Some(home) = std::env::var_os("HOME") else { return };
+    let dir = std::path::Path::new(&home).join("Library/Logs/BrowserPicker");
+    if std::fs::create_dir_all(&dir).is_ok() {
+        let _ = std::fs::write(dir.join("placement.log"), lines.join("\n") + "\n");
+    }
+}
+
 /// Places the picker (`width`×`height` points) on the display under the cursor and shows it.
 pub fn present_picker(window: &WebviewWindow, width: f64, height: f64, placement: Placement) {
     let handle = window.clone();
@@ -134,18 +152,68 @@ pub fn present_picker(window: &WebviewWindow, width: f64, height: f64, placement
 
         let mouse = NSEvent::mouseLocation();
         let cursor = (mouse.x, -mouse.y);
-        let screen = NSScreen::screens(mtm)
+        let screens = NSScreen::screens(mtm);
+        let mut log = vec![
+            format!("version {}", env!("CARGO_PKG_VERSION")),
+            format!("placement {placement:?}, size {width:.0}x{height:.0}"),
+            format!("mouse ({:.0}, {:.0})", mouse.x, mouse.y),
+            format!("separate spaces {}", NSScreen::screensHaveSeparateSpaces(mtm)),
+        ];
+        for (i, screen) in screens.iter().enumerate() {
+            log.push(format!(
+                "screen {i}: frame {} visible {}",
+                describe(screen.frame()),
+                describe(screen.visibleFrame())
+            ));
+        }
+
+        let screen = screens
             .iter()
             .find(|screen| flipped(screen.frame()).contains(cursor.0, cursor.1))
             .or_else(|| NSScreen::mainScreen(mtm));
-        if let Some(screen) = screen {
+        let target = screen.map(|screen| {
             let area = flipped(screen.visibleFrame());
             let (x, top) = placement::position(area, cursor, width, height, placement, placement::MARGIN);
-            let frame = NSRect::new(NSPoint::new(x, -top - height), NSSize::new(width, height));
+            NSRect::new(NSPoint::new(x, -top - height), NSSize::new(width, height))
+        });
+        if let Some(frame) = target {
+            log.push(format!("target {}", describe(frame)));
             ns_window.setFrame_display(frame, true);
+        } else {
+            log.push("no screen found".into());
         }
+
         let _ = handle.show();
         let _ = handle.set_focus();
+
+        // Ordering the window in or activating the app can move it back to the
+        // main display; put it where it belongs if that happened.
+        if let Some(frame) = target {
+            let shown = ns_window.frame();
+            log.push(format!("after show {}", describe(shown)));
+            if !same_origin(shown, frame) {
+                ns_window.setFrame_display(frame, true);
+            }
+        }
+        log_placement(&log);
+
+        // Check once more after AppKit has settled the activation.
+        let Some(frame) = target else { return };
+        let later = handle.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            let window = later.clone();
+            let _ = later.run_on_main_thread(move || {
+                let Ok(ptr) = window.ns_window() else { return };
+                let ns_window: &NSWindow = unsafe { &*(ptr as *const NSWindow) };
+                let settled = ns_window.frame();
+                if !same_origin(settled, frame) {
+                    ns_window.setFrame_display(frame, true);
+                }
+                log.push(format!("after 100ms {}", describe(settled)));
+                log_placement(&log);
+            });
+        });
     });
 }
 
