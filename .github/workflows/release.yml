@@ -1,0 +1,108 @@
+name: Release
+
+# Push a tag like v0.2.0 for a release, or v0.2.0-beta.1 for a pre-release.
+# Or run it from the Actions tab: it creates the tag on the selected branch.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to create, e.g. v0.1.0-beta.1 (a "-" suffix makes a pre-release)
+        required: true
+        default: v0.1.0-beta.1
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.result }}
+    steps:
+      - id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.payload.inputs?.tag || context.ref.replace('refs/tags/', '');
+            // A release created in the GitHub UI already exists for its tag: reuse it.
+            try {
+              const { data } = await github.rest.repos.getReleaseByTag({ owner: context.repo.owner, repo: context.repo.repo, tag });
+              return data.id;
+            } catch (err) {
+              if (err.status !== 404) throw err;
+            }
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              target_commitish: context.sha,
+              name: `BrowserPicker ${tag}`,
+              draft: true,
+              prerelease: tag.includes('-'),
+              body: [
+                '### Download',
+                '- **macOS 12+** (Apple Silicon and Intel): `BrowserPicker_*_universal.dmg`',
+                '- **Windows 10/11**: `BrowserPicker_*_x64-setup.exe`',
+                '',
+                '### First launch',
+                'The builds are not notarized or code-signed yet.',
+                '- **macOS**: open the app once, then go to *System Settings → Privacy & Security* and click *Open Anyway*.',
+                '  Or run `xattr -dr com.apple.quarantine /Applications/BrowserPicker.app`.',
+                '- **Windows**: if SmartScreen appears, click *More info → Run anyway*.',
+                '',
+                'Then click **Make Default** in the BrowserPicker window.',
+              ].join('\n'),
+            });
+            return data.id;
+
+  build:
+    name: ${{ matrix.name }}
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS (universal)
+            os: macos-latest
+            args: --target universal-apple-darwin
+            targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - name: Windows (x64)
+            os: windows-latest
+            args: ''
+            targets: ''
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.targets }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: ${{ matrix.args }}
+
+  publish:
+    needs: [create-release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release_id }},
+              draft: false,
+            });

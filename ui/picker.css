@@ -1,0 +1,233 @@
+/* The window is sized to the panel. On Windows the panel is drawn here with a
+   margin for its shadow; on macOS the window itself is the native popover material. */
+
+body {
+  --margin: 0px;
+  --radius: 14px;
+  --item-w: 90px;
+  padding: var(--margin);
+  overflow: hidden;
+}
+
+:root[data-platform="windows"] body,
+:root[data-platform="linux"] body {
+  --margin: 22px;
+  --radius: 10px;
+}
+
+.panel {
+  position: absolute;
+  top: var(--margin);
+  left: var(--margin);
+  width: max-content;
+  min-width: 300px;
+  padding: 6px 8px 8px;
+  border-radius: var(--radius);
+  transform-origin: 50% 40%;
+}
+
+:root:not([data-platform="macos"]) .panel {
+  background: rgba(249, 249, 249, 0.97);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 12px 30px rgba(0, 0, 0, 0.2),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-platform="macos"]) .panel {
+    background: rgba(40, 40, 40, 0.97);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.08),
+      0 12px 30px rgba(0, 0, 0, 0.45),
+      0 2px 8px rgba(0, 0, 0, 0.25);
+  }
+}
+
+/* ---- Link header ---- */
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 0;
+  min-width: 100%;
+  height: 30px;
+  padding: 0 2px 0 8px;
+}
+
+.link-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.host { color: var(--text); font-weight: 600; }
+
+.copy {
+  position: relative;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--text-2);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.copy:hover { background: var(--fill); color: var(--text); }
+.copy:active { background: var(--fill-strong); }
+
+.copy svg {
+  position: absolute;
+  inset: 4px;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: opacity 0.2s, transform 0.3s var(--ease-spring);
+}
+
+.copy .icon-done { opacity: 0; transform: scale(0.5); stroke-width: 1.8; color: var(--accent); }
+.copy.done .icon-copy { opacity: 0; transform: scale(0.5); }
+.copy.done .icon-done { opacity: 1; transform: none; }
+
+/* ---- Browser grid ---- */
+
+.grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 4), var(--item-w));
+  gap: 2px;
+}
+
+.highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 10px;
+  background: var(--fill);
+  pointer-events: none;
+  transition:
+    transform 0.22s var(--ease-out),
+    width 0.22s var(--ease-out),
+    height 0.22s var(--ease-out),
+    opacity 0.15s;
+}
+
+.highlight.instant { transition: none; }
+
+.item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: var(--item-w);
+  padding: 10px 4px 8px;
+  border-radius: 10px;
+}
+
+.item:focus-visible { outline: none; }
+
+.item img,
+.item .placeholder {
+  width: 48px;
+  height: 48px;
+  transition: transform 0.25s var(--ease-spring);
+}
+
+.item .placeholder {
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--fill-strong);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.item[aria-selected="true"] img,
+.item[aria-selected="true"] .placeholder { transform: scale(1.06); }
+
+.item:active img,
+.item:active .placeholder { transform: scale(0.94); transition-duration: 0.08s; }
+
+.item .name {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 11.5px;
+}
+
+.item kbd {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  font: 600 10px/1 var(--font);
+  color: var(--text-3);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.item[aria-selected="true"] kbd,
+body.keyboard .item kbd { opacity: 1; }
+
+.empty {
+  grid-column: 1 / -1;
+  padding: 18px 12px 14px;
+  text-align: center;
+  color: var(--text-2);
+}
+
+/* ---- Open / close choreography ---- */
+
+.panel { opacity: 0; }
+
+/* Windows: the panel itself springs in. */
+:root:not([data-platform="macos"]) .panel {
+  transform: scale(0.94) translateY(6px);
+  transition: opacity 0.12s ease-in, transform 0.14s ease-in;
+}
+
+:root:not([data-platform="macos"]) body[data-state="open"] .panel {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.16s ease-out, transform 0.32s var(--ease-spring);
+}
+
+:root:not([data-platform="macos"]) body[data-state="chosen"] .panel {
+  opacity: 0;
+  transform: scale(1.02);
+}
+
+/* macOS: the window pops in natively; the content follows with a short stagger. */
+:root[data-platform="macos"] body[data-state="open"] .panel,
+:root[data-platform="macos"] body[data-state="closing"] .panel,
+:root[data-platform="macos"] body[data-state="chosen"] .panel { opacity: 1; }
+
+:root[data-platform="macos"] body[data-state="open"] .link,
+:root[data-platform="macos"] body[data-state="open"] .item {
+  animation: rise 0.34s var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 18ms + 20ms);
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(5px); }
+}
+
+body[data-state="chosen"] .item.launching img {
+  animation: launch 0.22s var(--ease-out);
+}
+
+@keyframes launch {
+  40% { transform: scale(0.88); }
+  to { transform: scale(1.06); }
+}

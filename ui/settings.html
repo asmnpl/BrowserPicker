@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BrowserPicker</title>
+  <link rel="stylesheet" href="common.css">
+  <link rel="stylesheet" href="settings.css">
+  <script src="common.js"></script>
+  <script src="settings.js" defer></script>
+</head>
+<body>
+  <div class="titlebar" data-tauri-drag-region></div>
+  <main>
+    <section class="hero" data-tauri-drag-region>
+      <img class="app-icon" src="assets/icon.png" alt="" draggable="false">
+      <div>
+        <h1>BrowserPicker</h1>
+        <p class="muted">Choose a browser for every link. <span id="version"></span></p>
+      </div>
+    </section>
+
+    <div class="card status" id="status">
+      <div class="row">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span class="row-text">
+          <span class="title" id="statusTitle">Not your default browser</span>
+          <span class="subtitle" id="statusText">Make BrowserPicker the default browser so links from other apps open the picker.</span>
+        </span>
+        <button class="btn primary" id="makeDefault" type="button">Make Default</button>
+      </div>
+    </div>
+
+    <h2>General</h2>
+    <div class="card">
+      <label class="row">
+        <span class="row-text">
+          <span class="title">Launch at login</span>
+          <span class="subtitle">Start quietly in the background.</span>
+        </span>
+        <input class="switch" type="checkbox" id="launchAtLogin">
+      </label>
+      <label class="row">
+        <span class="row-text">
+          <span class="title" id="trayTitle">Show icon in system tray</span>
+          <span class="subtitle">Without it, open the app again to get back here.</span>
+        </span>
+        <input class="switch" type="checkbox" id="showTray">
+      </label>
+      <div class="row">
+        <span class="row-text"><span class="title">Picker position</span></span>
+        <div class="segmented" id="placement" role="radiogroup">
+          <span class="thumb" aria-hidden="true"></span>
+          <button type="button" role="radio" data-value="cursor">Near cursor</button>
+          <button type="button" role="radio" data-value="center">Screen center</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <h2>Browsers</h2>
+      <button class="btn plain" id="rescan" type="button">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v2.5H11"/></svg>
+        Rescan
+      </button>
+    </div>
+    <div class="card" id="browsers" role="list"></div>
+    <p class="hint">Drag to reorder, switch off to hide from the picker.<br>
+      In the picker: <kbd>1</kbd>–<kbd>9</kbd> choose · <kbd>←</kbd><kbd>→</kbd> + <kbd>Enter</kbd> · <kbd>Esc</kbd> dismiss · <kbd id="copyKey">Ctrl C</kbd> copy link</p>
+
+    <footer>
+      <button class="btn" id="quit" type="button">Quit BrowserPicker</button>
+    </footer>
+  </main>
+</body>
+</html>

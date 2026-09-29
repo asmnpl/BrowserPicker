@@ -1,0 +1,15 @@
+{
+  "name": "browserpicker",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pick a browser for every link you open",
+  "license": "MIT",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

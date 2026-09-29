@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BrowserPicker</title>
+  <link rel="stylesheet" href="common.css">
+  <link rel="stylesheet" href="picker.css">
+  <script src="common.js"></script>
+  <script src="picker.js" defer></script>
+</head>
+<body data-state="idle">
+  <main id="panel" class="panel" role="dialog" aria-label="Choose a browser">
+    <header class="link">
+      <div class="link-text" id="link"><span class="host" id="host"></span><span class="rest" id="rest"></span></div>
+      <button class="copy" id="copy" type="button" aria-label="Copy link" tabindex="-1">
+        <svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="2"/><path d="M10.5 3.5v-.25A1.75 1.75 0 0 0 8.75 1.5h-5A1.75 1.75 0 0 0 2 3.25v5A1.75 1.75 0 0 0 3.75 10h.25"/></svg>
+        <svg class="icon-done" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>
+      </button>
+    </header>
+    <div class="grid" id="grid" role="listbox" aria-label="Browsers"></div>
+  </main>
+</body>
+</html>
