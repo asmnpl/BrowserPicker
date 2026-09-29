@@ -1,9 +1,16 @@
 name: Release
 
 # Push a tag like v0.2.0 for a release, or v0.2.0-beta.1 for a pre-release.
+# Or run it from the Actions tab: it creates the tag on the selected branch.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to create, e.g. v0.1.0-beta.1 (a "-" suffix makes a pre-release)
+        required: true
+        default: v0.1.0-beta.1
 
 permissions:
   contents: write
@@ -18,11 +25,19 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const tag = context.ref.replace('refs/tags/', '');
+            const tag = context.payload.inputs?.tag || context.ref.replace('refs/tags/', '');
+            // A release created in the GitHub UI already exists for its tag: reuse it.
+            try {
+              const { data } = await github.rest.repos.getReleaseByTag({ owner: context.repo.owner, repo: context.repo.repo, tag });
+              return data.id;
+            } catch (err) {
+              if (err.status !== 404) throw err;
+            }
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: tag,
+              target_commitish: context.sha,
               name: `BrowserPicker ${tag}`,
               draft: true,
               prerelease: tag.includes('-'),
